@@ -1,0 +1,45 @@
+import express from "express";
+import "dotenv/config";
+import cors from "cors";
+import connectDB from "./config/db.js";
+import authRoutes from "./routes/auth.js";
+import adminRoutes from "./routes/admin.js";
+import productRoutes from "./routes/product.js";
+import { promises as dns } from "dns";
+
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+
+const app = express();
+
+// Connect DB (IMPORTANT: call inside handler safe way in production)
+connectDB();
+
+app.use(express.json());
+
+const allowedOrigins = [
+  "http://localhost:5173",
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed"));
+    }
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/products", productRoutes);
+
+app.get("/", (req, res) => {
+  res.send("Backend is running!");
+});
+
+export default app;
