@@ -86,8 +86,6 @@ export const updateProduct = async (req, res) => {
     } = req.body;
 
 
-    console.log("amazingDeals:", amazingDeals); // kya aa raha?
-    console.log("newArrivals:", newArrivals);
     const product = await Product.findById(req.params.id);
     if (!product)
       return res.status(404).json({ message: "Product not found" });
@@ -115,7 +113,9 @@ export const updateProduct = async (req, res) => {
     product.amazonLink = amazonLink;
     product.description = description;
     product.highlights = parsedHighlights;
-
+ // ✅ Convert checkbox strings to boolean
+    product.amazingDeals = amazingDeals === "true";
+    product.newArrivals = newArrivals === "true";
     // ✅ IMAGE MERGE SYSTEM
     let updatedImages = [...parsedExistingImages];
 
