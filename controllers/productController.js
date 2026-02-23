@@ -81,8 +81,13 @@ export const updateProduct = async (req, res) => {
       description,
       highlights,
       existingImages,
+      amazingDeals,
+      newArrivals,
     } = req.body;
 
+
+    console.log("amazingDeals:", amazingDeals); // kya aa raha?
+    console.log("newArrivals:", newArrivals);
     const product = await Product.findById(req.params.id);
     if (!product)
       return res.status(404).json({ message: "Product not found" });
