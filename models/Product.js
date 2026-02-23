@@ -12,13 +12,13 @@ const productSchema = new mongoose.Schema({
   highlights: [{ type: String }],
   images: [{ type: String }], // Cloudinary URLs
   amazingDeals: {
-  type: Boolean,
-  default: false,
-},
-newArrivals: {
-  type: Boolean,
-  default: false,
-},
+    type: Boolean,
+    default: false,
+  },
+  newArrivals: {
+    type: Boolean,
+    default: false,
+  },
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);
