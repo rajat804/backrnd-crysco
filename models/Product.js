@@ -4,12 +4,15 @@ const productSchema = new mongoose.Schema({
   title: { type: String, required: true },
   category: { type: String, required: true },
   categoryType: { type: String },
-  sizes: [{ type: String }],
+  sizes: { type: [String],default: [] },
   mrp: { type: Number },
   salePrice: { type: Number },
   amazonLink: { type: String },
   description: { type: String },
-  highlights: [{ type: String }],
+  highlights: {
+    type: [String],
+    default: [],
+  },
   images: [{ type: String }], // Cloudinary URLs
   amazingDeals: {
     type: Boolean,
