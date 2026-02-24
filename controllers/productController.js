@@ -22,11 +22,28 @@ export const addProduct = async (req, res) => {
       }))
     );
 
+
+let parsedSizes = [];
+
+if (sizes) {
+  try {
+    const temp = JSON.parse(sizes);
+
+    if (Array.isArray(temp)) {
+      parsedSizes = temp;
+    } else if (typeof temp === "string") {
+      parsedSizes = temp.split(",").map(s => s.trim());
+    }
+  } catch (err) {
+    parsedSizes = sizes.split(",").map(s => s.trim());
+  }
+}
+
     const product = await Product.create({
       title,
       category,
       categoryType,
-      sizes: sizes ? JSON.parse(sizes) : [],
+      sizes: parsedSizes,
       mrp,
       salePrice,
       amazonLink,
@@ -85,38 +102,90 @@ export const updateProduct = async (req, res) => {
       newArrivals,
     } = req.body;
 
-
     const product = await Product.findById(req.params.id);
-    if (!product)
+    if (!product) {
       return res.status(404).json({ message: "Product not found" });
+    }
 
-    const parsedSizes = sizes ? JSON.parse(sizes) : [];
-    const parsedHighlights = highlights ? JSON.parse(highlights) : [];
-    const parsedExistingImages = existingImages
-      ? JSON.parse(existingImages)
-      : product.images;
+    /* ==============================
+       SAFE SIZES PARSE
+    ============================== */
+    let parsedSizes = [];
 
-    // Basic update
-    product.title = title;
-    product.category = category;
+    if (sizes) {
+      try {
+        const temp = JSON.parse(sizes);
 
+        if (Array.isArray(temp)) {
+          parsedSizes = temp;
+        } else if (typeof temp === "string") {
+          parsedSizes = temp.split(",").map(s => s.trim());
+        }
+      } catch {
+        parsedSizes = sizes.split(",").map(s => s.trim());
+      }
+    }
+
+    /* ==============================
+       SAFE HIGHLIGHTS PARSE
+    ============================== */
+    let parsedHighlights = [];
+
+    if (highlights) {
+      try {
+        const temp = JSON.parse(highlights);
+        parsedHighlights = Array.isArray(temp)
+          ? temp
+          : temp.split(",").map(h => h.trim());
+      } catch {
+        parsedHighlights = highlights.split(",").map(h => h.trim());
+      }
+    }
+
+    /* ==============================
+       EXISTING IMAGES PARSE
+    ============================== */
+    let parsedExistingImages = product.images;
+
+    if (existingImages) {
+      try {
+        parsedExistingImages = JSON.parse(existingImages);
+      } catch {
+        parsedExistingImages = product.images;
+      }
+    }
+
+    /* ==============================
+       BASIC FIELD UPDATE
+    ============================== */
+    product.title = title || product.title;
+    product.category = category || product.category;
+    product.mrp = mrp || product.mrp;
+    product.salePrice = salePrice || product.salePrice;
+    product.amazonLink = amazonLink || product.amazonLink;
+    product.description = description || product.description;
+    product.highlights = parsedHighlights;
+
+    /* ==============================
+       CATEGORY LOGIC
+    ============================== */
     if (category === "garbage bags") {
-      product.categoryType = categoryType;
+      product.categoryType = categoryType || "";
       product.sizes = parsedSizes;
     } else {
       product.categoryType = "";
       product.sizes = [];
     }
 
-    product.mrp = mrp;
-    product.salePrice = salePrice;
-    product.amazonLink = amazonLink;
-    product.description = description;
-    product.highlights = parsedHighlights;
- // ✅ Convert checkbox strings to boolean
+    /* ==============================
+       BOOLEAN FIX
+    ============================== */
     product.amazingDeals = amazingDeals === "true";
     product.newArrivals = newArrivals === "true";
-    // ✅ IMAGE MERGE SYSTEM
+
+    /* ==============================
+       IMAGE MERGE SYSTEM
+    ============================== */
     let updatedImages = [...parsedExistingImages];
 
     if (req.files && req.files.length > 0) {
@@ -133,10 +202,16 @@ export const updateProduct = async (req, res) => {
 
     await product.save();
 
-    res.json({ message: "Product updated successfully", product });
+    res.status(200).json({
+      message: "Product updated successfully",
+      product,
+    });
+
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: error.message });
+    console.error("Update Error:", error);
+    res.status(500).json({
+      message: "Server error while updating product",
+    });
   }
 };
 
