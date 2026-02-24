@@ -3,7 +3,8 @@ import Cart from "../models/Cart.js";
 export const addToCart = async (req, res) => {
   try {
     const userId = req.user._id;
-    const {
+
+    let {
       productId,
       title,
       price,
@@ -13,9 +14,16 @@ export const addToCart = async (req, res) => {
       image,
     } = req.body;
 
+    quantity = Number(quantity) || 1;
+    size = size ? String(size) : null;
+    color = color ? String(color) : null;
+
+    if (!size) {
+      return res.status(400).json({ message: "Size is required" });
+    }
+
     let cart = await Cart.findOne({ user: userId });
 
-    // 🆕 Agar cart nahi hai toh create karo
     if (!cart) {
       cart = new Cart({
         user: userId,
@@ -23,7 +31,6 @@ export const addToCart = async (req, res) => {
       });
     }
 
-    // 🔎 Check karo product already cart me hai ya nahi
     const existingItem = cart.items.find(
       (item) =>
         item.productId.toString() === productId &&
@@ -31,26 +38,33 @@ export const addToCart = async (req, res) => {
         item.color === color
     );
 
+    // ❌ Strict mode — no duplicate
     if (existingItem) {
-      existingItem.quantity += quantity;
-    } else {
-      cart.items.push({
-        productId,
-        title,
-        price,
-        quantity,
-        size,
-        color,
-        image,
+      return res.status(400).json({
+        message: "This size already exists in cart",
       });
     }
 
+    cart.items.push({
+      productId,
+      title,
+      price,
+      quantity,
+      size,
+      color,
+      image,
+    });
+
     await cart.save();
 
-    res.status(200).json({ message: "Item added to cart", cart });
+    res.status(200).json({
+      message: "Item added successfully",
+      cart,
+    });
+
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Server Error" });
+    console.log("CART ERROR:", error);
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -71,17 +85,21 @@ export const getCart = async (req, res) => {
 export const updateCartItem = async (req, res) => {
   const { productId, quantity, size, color } = req.body;
   try {
+    if (!size || !color)
+      return res.status(400).json({ message: "Size and color required" });
+
     const cart = await Cart.findOne({ user: req.user._id });
     if (!cart) return res.status(404).json({ message: "Cart not found" });
 
-    const itemIndex = cart.products.findIndex(
+    const itemIndex = cart.items.findIndex(
       (p) =>
         p.productId.toString() === productId &&
-        p.size === (size || "") &&
-        p.color === (color || "")
+        p.size === size &&
+        p.color === color
     );
+
     if (itemIndex > -1) {
-      cart.products[itemIndex].quantity = quantity;
+      cart.items[itemIndex].quantity = quantity;
       await cart.save();
       res.json(cart);
     } else {
