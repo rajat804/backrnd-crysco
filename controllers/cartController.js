@@ -1,5 +1,6 @@
 import Cart from "../models/Cart.js";
 
+
 export const addToCart = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -14,16 +15,17 @@ export const addToCart = async (req, res) => {
       image,
     } = req.body;
 
+    if (!productId || !price) {
+      return res.status(400).json({ message: "Product data missing" });
+    }
+
     quantity = Number(quantity) || 1;
     size = size ? String(size) : null;
     color = color ? String(color) : null;
 
-    if (!size) {
-      return res.status(400).json({ message: "Size is required" });
-    }
-
     let cart = await Cart.findOne({ user: userId });
 
+    // Agar cart exist nahi karta toh create karo
     if (!cart) {
       cart = new Cart({
         user: userId,
@@ -31,34 +33,34 @@ export const addToCart = async (req, res) => {
       });
     }
 
-    const existingItem = cart.items.find(
+    // Same product + same size + same color check
+    const existingItemIndex = cart.items.findIndex(
       (item) =>
         item.productId.toString() === productId &&
         item.size === size &&
         item.color === color
     );
 
-    // ❌ Strict mode — no duplicate
-    if (existingItem) {
-      return res.status(400).json({
-        message: "This size already exists in cart",
+    if (existingItemIndex > -1) {
+      // ✅ Already exists → quantity increase karo
+      cart.items[existingItemIndex].quantity += quantity;
+    } else {
+      // ✅ New item add karo
+      cart.items.push({
+        productId,
+        title,
+        price,
+        quantity,
+        size,
+        color,
+        image,
       });
     }
-
-    cart.items.push({
-      productId,
-      title,
-      price,
-      quantity,
-      size,
-      color,
-      image,
-    });
 
     await cart.save();
 
     res.status(200).json({
-      message: "Item added successfully",
+      message: "Cart updated successfully",
       cart,
     });
 
@@ -67,7 +69,6 @@ export const addToCart = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 export const getCart = async (req, res) => {
   try {
     const cart = await Cart.findOne({ user: req.user._id });
@@ -83,30 +84,46 @@ export const getCart = async (req, res) => {
 };
 
 export const updateCartItem = async (req, res) => {
-  const { productId, quantity, size, color } = req.body;
   try {
-    if (!size || !color)
-      return res.status(400).json({ message: "Size and color required" });
+    const { productId, size, color, quantity } = req.body;
+
+    if (!productId || !size || !color) {
+      return res.status(400).json({ message: "Product info missing" });
+    }
 
     const cart = await Cart.findOne({ user: req.user._id });
-    if (!cart) return res.status(404).json({ message: "Cart not found" });
+
+    if (!cart) {
+      return res.status(404).json({ message: "Cart not found" });
+    }
 
     const itemIndex = cart.items.findIndex(
-      (p) =>
-        p.productId.toString() === productId &&
-        p.size === size &&
-        p.color === color
+      (item) =>
+        item.productId.toString() === productId &&
+        item.size === size &&
+        item.color === color
     );
 
-    if (itemIndex > -1) {
-      cart.items[itemIndex].quantity = quantity;
-      await cart.save();
-      res.json(cart);
-    } else {
-      res.status(404).json({ message: "Item not found in cart" });
+    if (itemIndex === -1) {
+      return res.status(404).json({ message: "Item not found in cart" });
     }
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+
+    if (quantity <= 0) {
+      // quantity 0 ho toh remove kar do
+      cart.items.splice(itemIndex, 1);
+    } else {
+      cart.items[itemIndex].quantity = quantity;
+    }
+
+    await cart.save();
+
+    res.json({
+      message: "Cart updated",
+      cart,
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
