@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import productRoutes from "./routes/product.js";
 import cartRoutes from "./routes/cartRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 import { promises as dns } from "dns";
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
@@ -40,7 +41,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
-
+app.use("/api/payment", paymentRoutes);
 
 
 app.get("/", (req, res) => {
