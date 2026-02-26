@@ -2,7 +2,7 @@ import express from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import Order from "../models/Order.js";
-import User from "../models/User.js";
+import Cart from "../models/Cart.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -12,46 +12,49 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// ✅ Create Razorpay Order
+
+// ================= CREATE ORDER =================
 router.post("/create-order", authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const cart = await Cart.findOne({ user: req.user._id });
 
-    const totalAmount = user.cart.reduce(
+    if (!cart || cart.items.length === 0) {
+      return res.status(400).json({ message: "Cart is empty" });
+    }
+
+    const totalAmount = cart.items.reduce(
       (acc, item) => acc + item.price * item.quantity,
       0
     );
 
-    const options = {
-      amount: totalAmount * 100, // paisa
+    const razorpayOrder = await razorpay.orders.create({
+      amount: totalAmount * 100,
       currency: "INR",
       receipt: `receipt_${Date.now()}`,
-    };
-
-    const razorpayOrder = await razorpay.orders.create(options);
-
-    const order = new Order({
-      user: user._id,
-      items: user.cart,
-      totalAmount,
-      razorpayOrderId: razorpayOrder.id,
-      shippingAddress: req.body.shippingAddress,
     });
 
-    await order.save();
+    const order = await Order.create({
+      user: req.user._id,
+      items: cart.items,
+      shippingAddress: req.body.shippingAddress,
+      totalAmount,
+      razorpayOrderId: razorpayOrder.id,
+    });
 
     res.json({
       key: process.env.RAZORPAY_KEY_ID,
-      amount: options.amount,
+      amount: totalAmount * 100,
       orderId: razorpayOrder.id,
     });
+
   } catch (err) {
     console.log(err);
-    res.status(500).json({ message: "Error creating order" });
+    res.status(500).json({ message: "Order creation failed" });
   }
 });
 
-// ✅ Verify Payment
+
+// ================= VERIFY PAYMENT =================
 router.post("/verify", authMiddleware, async (req, res) => {
   try {
     const {
@@ -64,27 +67,33 @@ router.post("/verify", authMiddleware, async (req, res) => {
 
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(body.toString())
+      .update(body)
       .digest("hex");
 
-    if (expectedSignature === razorpay_signature) {
-      const order = await Order.findOne({
-        razorpayOrderId: razorpay_order_id,
-      });
-
-      order.status = "Paid";
-      order.razorpayPaymentId = razorpay_payment_id;
-      await order.save();
-
-      // 🔥 Clear Cart
-      const user = await User.findById(order.user);
-      user.cart = [];
-      await user.save();
-
-      res.json({ message: "Payment successful" });
-    } else {
-      res.status(400).json({ message: "Payment verification failed" });
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ message: "Payment verification failed" });
     }
+
+    const order = await Order.findOne({
+      razorpayOrderId: razorpay_order_id,
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    order.status = "Paid";
+    order.razorpayPaymentId = razorpay_payment_id;
+    await order.save();
+
+    // 🔥 Clear Cart
+    await Cart.findOneAndUpdate(
+      { user: order.user },
+      { items: [] }
+    );
+
+    res.json({ message: "Payment successful" });
+
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Verification failed" });
