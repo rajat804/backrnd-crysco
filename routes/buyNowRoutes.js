@@ -1,60 +1,97 @@
-const handleBuyNow = async () => {
-  if (!size) return alert("Select size");
+import express from "express";
+import Razorpay from "razorpay";
+import crypto from "crypto";
+import Order from "../models/Order.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
-  const res = await fetch(`${BASE_URL}/api/orders/buy-now`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      product: {
-        _id: product._id,
-        title: product.title,
-        price: product.salePrice,
-        size,
-        image: product.images[0],
-      },
+const router = express.Router();
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+
+// ✅ CREATE ORDER
+router.post("/create", authMiddleware, async (req, res) => {
+  try {
+    const { product, quantity } = req.body;
+
+    if (!product || !quantity) {
+      return res.status(400).json({ message: "Missing data" });
+    }
+
+    const totalAmount = product.price * quantity;
+
+    const order = await razorpay.orders.create({
+      amount: totalAmount * 100,
+      currency: "INR",
+    });
+
+    res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key: process.env.RAZORPAY_KEY_ID,
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+// ✅ VERIFY PAYMENT
+router.post("/verify", authMiddleware, async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      product,
       quantity,
-    }),
-  });
+      shippingAddress,
+    } = req.body;
 
-  const data = await res.json();
+    const sign = razorpay_order_id + "|" + razorpay_payment_id;
 
-  const options = {
-    key: data.key, // ✅ backend se aa rahi
-    amount: data.amount,
-    currency: data.currency,
-    order_id: data.orderId,
-    name: "Monster Store",
-    description: "Buy Now Payment",
+    const expectedSign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(sign)
+      .digest("hex");
 
-    handler: async function (response) {
-      await fetch(`${BASE_URL}/api/orders/verify-buy-now`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...response,
-          product: {
-            _id: product._id,
-            title: product.title,
-            price: product.salePrice,
-            size,
-            image: product.images[0],
-          },
+    if (expectedSign !== razorpay_signature) {
+      return res.status(400).json({ message: "Invalid signature" });
+    }
+
+    const newOrder = new Order({
+      user: req.user.id,
+      items: [
+        {
+          productId: product._id,
+          title: product.title,
+          price: product.price,
           quantity,
-          shippingAddress,
-        }),
-      });
+          size: product.size,
+          image: product.image,
+        },
+      ],
+      shippingAddress,
+      totalAmount: product.price * quantity,
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      orderStatus: "Processing",
+    });
 
-      alert("Order Placed Successfully");
-      window.location.href = "/my-orders";
-    },
-  };
+    await newOrder.save();
 
-  const rzp = new window.Razorpay(options);
-  rzp.open();
-};
+    res.json({ message: "Order placed successfully" });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Verification failed" });
+  }
+});
+
+export default router;
