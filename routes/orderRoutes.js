@@ -18,11 +18,6 @@ router.get("/my-orders", authMiddleware, async (req, res) => {
 
 router.get("/admin/all-orders", authMiddleware, async (req, res) => {
   try {
-    // Check admin role
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
     const orders = await Order.find()
       .populate("user", "name email")
       .sort({ createdAt: -1 });
@@ -33,12 +28,9 @@ router.get("/admin/all-orders", authMiddleware, async (req, res) => {
   }
 });
 
-router.put("/admin/update-status/:id", authMiddleware, async (req, res) => {
+router.put("/admin/update-status/:id", async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
+   
     const { orderStatus } = req.body;
 
     const order = await Order.findByIdAndUpdate(
