@@ -2,7 +2,7 @@ import express from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import Order from "../models/Order.js";
-import authMiddleware from "../middleware/authMiddleware.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
