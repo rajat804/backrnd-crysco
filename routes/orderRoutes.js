@@ -45,5 +45,21 @@ router.put("/admin/update-status/:id", async (req, res) => {
   }
 });
 
+// PUT /api/orders/cancel/:id
+
+router.put("/cancel/:id", authMiddleware, async (req, res) => {
+  const order = await Order.findById(req.params.id);
+
+  if (!order) return res.status(404).json({ message: "Order not found" });
+
+  if (order.orderStatus !== "Processing") {
+    return res.status(400).json({ message: "Cannot cancel this order" });
+  }
+
+  order.orderStatus = "Cancelled";
+  await order.save();
+
+  res.json({ message: "Order cancelled successfully" });
+});
 
 export default router;
