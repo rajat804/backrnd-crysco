@@ -62,4 +62,95 @@ router.put("/cancel/:id", authMiddleware, async (req, res) => {
   res.json({ message: "Order cancelled successfully" });
 });
 
+// ✅ Create Razorpay order for Buy Now
+router.post("/buy-now", authMiddleware, async (req, res) => {
+  try {
+    const { product, quantity } = req.body;
+
+    if (!product || !quantity) {
+      return res.status(400).json({ message: "Product data missing" });
+    }
+
+    const totalAmount = product.price * quantity;
+
+    const razorpayOrder = await razorpay.orders.create({
+      amount: totalAmount * 100,
+      currency: "INR",
+      receipt: "receipt_" + Date.now(),
+    });
+
+    res.json({
+      razorpayOrderId: razorpayOrder.id,
+      amount: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to create Buy Now order" });
+  }
+});
+
+
+
+// ✅ Verify payment and save order
+router.post("/verify-buy-now", authMiddleware, async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      product,
+      quantity,
+      shippingAddress,
+    } = req.body;
+
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest("hex");
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ message: "Payment verification failed" });
+    }
+
+    const totalAmount = product.price * quantity;
+
+    const newOrder = new Order({
+      user: req.user._id,
+      items: [
+        {
+          productId: product._id,
+          title: product.title,
+          price: product.price,
+          quantity,
+          size: product.size,
+          color: product.color,
+          image: product.image,
+        },
+      ],
+      shippingAddress,
+      totalAmount,
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      status: "Paid",
+      orderStatus: "Processing",
+    });
+
+    await newOrder.save();
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Verification failed" });
+  }
+});
+
+
+
+
+
 export default router;
