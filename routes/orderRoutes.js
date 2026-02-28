@@ -16,7 +16,7 @@ router.get("/my-orders", authMiddleware, async (req, res) => {
 });
 
 
-router.get("/admin/all-orders", authMiddleware, async (req, res) => {
+router.get("/admin/all-orders",  async (req, res) => {
   try {
     const orders = await Order.find()
       .populate("user", "name email")
