@@ -8,6 +8,7 @@ import productRoutes from "./routes/product.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
+import buyNowRoutes from "./routes/buyNowRoutes.js";
 import { promises as dns } from "dns";
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
@@ -44,6 +45,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/buy-now", buyNowRoutes);
 
 app.get("/", (req, res) => {
   res.send("Backend is running!");
