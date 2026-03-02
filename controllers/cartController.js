@@ -1,5 +1,7 @@
 import Cart from "../models/Cart.js";
+import Product from "../models/Product.js"; // 🔥 Important
 
+// ================= ADD TO CART =================
 export const addToCart = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -18,8 +20,19 @@ export const addToCart = async (req, res) => {
     size = size ? String(size) : null;
     color = color ? String(color) : null;
 
-    if (!size) {
+    // 🔥 Get real product from DB (Secure Method)
+    const product = await Product.findById(productId);
+    if (!product)
+      return res.status(404).json({ message: "Product not found" });
+
+    // ✅ Dynamic Size Check
+    if (product.sizes && product.sizes.length > 0 && !size) {
       return res.status(400).json({ message: "Size is required" });
+    }
+
+    // ✅ Dynamic Color Check
+    if (product.colors && product.colors.length > 0 && !color) {
+      return res.status(400).json({ message: "Color is required" });
     }
 
     let cart = await Cart.findOne({ user: userId });
@@ -34,14 +47,14 @@ export const addToCart = async (req, res) => {
     const existingItem = cart.items.find(
       (item) =>
         item.productId.toString() === productId &&
-        item.size === size &&
-        item.color === color
+        (item.size || null) === size &&
+        (item.color || null) === color
     );
 
-    // ❌ Strict mode — no duplicate
+    // ❌ Strict Mode (No duplicate)
     if (existingItem) {
       return res.status(400).json({
-        message: "This size already exists in cart",
+        message: "This product variant already exists in cart",
       });
     }
 
@@ -68,6 +81,7 @@ export const addToCart = async (req, res) => {
   }
 };
 
+// ================= GET CART =================
 export const getCart = async (req, res) => {
   try {
     const cart = await Cart.findOne({ user: req.user._id });
@@ -82,34 +96,36 @@ export const getCart = async (req, res) => {
   }
 };
 
+// ================= UPDATE CART ITEM =================
 export const updateCartItem = async (req, res) => {
-  const { productId, quantity, size, color } = req.body;
   try {
-    if (!size || !color)
-      return res.status(400).json({ message: "Size and color required" });
+    const { productId, quantity, size, color } = req.body;
 
     const cart = await Cart.findOne({ user: req.user._id });
-    if (!cart) return res.status(404).json({ message: "Cart not found" });
+    if (!cart)
+      return res.status(404).json({ message: "Cart not found" });
 
     const itemIndex = cart.items.findIndex(
-      (p) =>
-        p.productId.toString() === productId &&
-        p.size === size &&
-        p.color === color
+      (item) =>
+        item.productId.toString() === productId &&
+        (item.size || null) === (size || null) &&
+        (item.color || null) === (color || null)
     );
 
     if (itemIndex > -1) {
-      cart.items[itemIndex].quantity = quantity;
+      cart.items[itemIndex].quantity = Number(quantity);
       await cart.save();
       res.json(cart);
     } else {
       res.status(404).json({ message: "Item not found in cart" });
     }
+
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
+// ================= REMOVE FROM CART =================
 export const removeFromCart = async (req, res) => {
   try {
     const { productId, size, color } = req.body;
@@ -124,8 +140,8 @@ export const removeFromCart = async (req, res) => {
       (item) =>
         !(
           item.productId.toString() === productId &&
-          item.size === size &&
-          item.color === color
+          (item.size || null) === (size || null) &&
+          (item.color || null) === (color || null)
         )
     );
 
