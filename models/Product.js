@@ -2,7 +2,11 @@ import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema({
   title: { type: String, required: true },
-  category: { type: String, required: true },
+  category: {  type: String,
+    required: true,
+    lowercase: true,
+    trim: true,
+   },
   categoryType: { type: String },
   sizes: { type: [String],default: [] },
   mrp: { type: Number },
