@@ -23,21 +23,21 @@ export const addProduct = async (req, res) => {
     );
 
 
-let parsedSizes = [];
+    let parsedSizes = [];
 
-if (sizes) {
-  try {
-    const temp = JSON.parse(sizes);
+    if (sizes) {
+      try {
+        const temp = JSON.parse(sizes);
 
-    if (Array.isArray(temp)) {
-      parsedSizes = temp;
-    } else if (typeof temp === "string") {
-      parsedSizes = temp.split(",").map(s => s.trim());
+        if (Array.isArray(temp)) {
+          parsedSizes = temp;
+        } else if (typeof temp === "string") {
+          parsedSizes = temp.split(",").map(s => s.trim());
+        }
+      } catch (err) {
+        parsedSizes = sizes.split(",").map(s => s.trim());
+      }
     }
-  } catch (err) {
-    parsedSizes = sizes.split(",").map(s => s.trim());
-  }
-}
 
     const product = await Product.create({
       title,
@@ -59,12 +59,31 @@ if (sizes) {
   }
 };
 
+
+
+
+
 // Get all products
 export const getProducts = async (req, res) => {
+  // try {
+  //   const products = await Product.find().sort({ createdAt: -1 });
+  //   res.json(products);
+  // } catch (error) {
+  //   res.status(500).json({ message: "Server error" });
+  // }
   try {
-    const products = await Product.find().sort({ createdAt: -1 });
+    const { category } = req.query; // read category from query string
+    let filter = {};
+
+    if (category) {
+      const formattedCategory = category.toLowerCase().replace(/-/g, " ").trim();
+      filter.category = formattedCategory;
+    }
+
+    const products = await Product.find(filter).sort({ createdAt: -1 });
     res.json(products);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -80,6 +99,14 @@ export const getProduct = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
+
+
+
+
+
 
 // ==========================
 // UPDATE PRODUCT
