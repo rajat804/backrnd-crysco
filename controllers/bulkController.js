@@ -46,11 +46,16 @@ export const createBulkProduct = async (req, res) => {
 // ✅ GET ALL BULK PRODUCTS
 export const getBulkProducts = async (req, res) => {
   try {
-    const products = await BulkProduct.find(); // Fetch products from the database
-    res.status(200).json(products); // Respond with products
+    console.log("Fetching bulk products...");
+    const products = await BulkProduct.find();
+    console.log("Products:", products);
+    res.status(200).json(products);
   } catch (error) {
-    console.error("❌ Error in getBulkProducts:", error); // Log the error details
-    res.status(500).json({ message: "Server error", error: error.message }); // Send detailed error message to client
+    console.error("Bulk fetch error:", error);
+    res.status(500).json({ 
+      message: error.message,
+      stack: error.stack
+    });
   }
 };
 
