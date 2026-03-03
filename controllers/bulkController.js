@@ -1,29 +1,21 @@
 import BulkProduct from "../models/BulkProduct.js";
 import cloudinary from "../config/cloudnary.js";
 
-// CREATE
+// ✅ CREATE
 export const createBulkProduct = async (req, res) => {
   try {
-    const { title, category, variants, amazonLink, description, highlights } =
-      req.body;
+    const {
+      title,
+      category,
+      variants,
+      amazonLink,
+      description,
+      highlights,
+    } = req.body;
 
-    const parsedVariants = JSON.parse(variants);
-    const parsedHighlights = JSON.parse(highlights);
+    const parsedVariants = JSON.parse(variants || "[]");
+    const parsedHighlights = JSON.parse(highlights || "[]");
 
-    // Upload images to Cloudinary
-    const imageUploads = await Promise.all(
-      req.files.map((file) =>
-        cloudinary.uploader.upload_stream(
-          { folder: "bulk_products" },
-          (error, result) => {
-            if (error) throw error;
-            return result;
-          }
-        )
-      )
-    );
-
-    // Because upload_stream works differently, we need buffer logic
     const uploadedImages = [];
 
     for (let file of req.files) {
@@ -53,49 +45,53 @@ export const createBulkProduct = async (req, res) => {
 
     res.status(201).json(product);
   } catch (error) {
+    console.error("❌ Create Bulk Product Error:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-
-
-// GET ALL
+// ✅ GET ALL
 export const getBulkProducts = async (req, res) => {
   try {
-    const products = await BulkProduct.find(); // Or whatever model you use
+    const products = await BulkProduct.find().sort({ createdAt: -1 });
     res.json(products);
   } catch (error) {
-    console.error("Error fetching bulk products:", error); // <- log error
+    console.error("❌ Error fetching bulk products:", error);
     res.status(500).json({ message: "Server Error" });
   }
 };
 
-
-
-// GET SINGLE
+// ✅ GET SINGLE
 export const getBulkProductById = async (req, res) => {
   try {
     const product = await BulkProduct.findById(req.params.id);
-    if (!product) return res.status(404).json({ message: "Not found" });
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
     res.json(product);
   } catch (error) {
+    console.error("❌ Error fetching product:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-
-
-// UPDATE
+// ✅ UPDATE
 export const updateBulkProduct = async (req, res) => {
   try {
-    const { title, category, variants, amazonLink, description, highlights } =
-      req.body;
+    const {
+      title,
+      category,
+      variants,
+      amazonLink,
+      description,
+      highlights,
+    } = req.body;
 
-    const parsedVariants = JSON.parse(variants);
-    const parsedHighlights = JSON.parse(highlights);
+    const parsedVariants = JSON.parse(variants || "[]");
+    const parsedHighlights = JSON.parse(highlights || "[]");
 
     let uploadedImages = [];
 
+    // If new images provided, upload them
     if (req.files && req.files.length > 0) {
       for (let file of req.files) {
         const result = await new Promise((resolve, reject) => {
@@ -113,7 +109,7 @@ export const updateBulkProduct = async (req, res) => {
       }
     }
 
-    const updated = await BulkProduct.findByIdAndUpdate(
+    const updatedProduct = await BulkProduct.findByIdAndUpdate(
       req.params.id,
       {
         title,
@@ -127,20 +123,26 @@ export const updateBulkProduct = async (req, res) => {
       { new: true }
     );
 
-    res.json(updated);
+    if (!updatedProduct)
+      return res.status(404).json({ message: "Product not found" });
+
+    res.json(updatedProduct);
   } catch (error) {
+    console.error("❌ Update Bulk Product Error:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-
-
-// DELETE
+// ✅ DELETE
 export const deleteBulkProduct = async (req, res) => {
   try {
-    await BulkProduct.findByIdAndDelete(req.params.id);
-    res.json({ message: "Bulk Product Deleted Successfully" });
+    const deleted = await BulkProduct.findByIdAndDelete(req.params.id);
+    if (!deleted)
+      return res.status(404).json({ message: "Product not found" });
+
+    res.json({ message: "Bulk Product deleted successfully" });
   } catch (error) {
+    console.error("❌ Delete Bulk Product Error:", error);
     res.status(500).json({ message: error.message });
   }
 };
