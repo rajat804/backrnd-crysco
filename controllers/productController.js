@@ -130,6 +130,7 @@ export const updateProduct = async (req, res) => {
     } = req.body;
 
     const product = await Product.findById(req.params.id);
+
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -137,6 +138,7 @@ export const updateProduct = async (req, res) => {
     /* ==============================
        SAFE SIZES PARSE
     ============================== */
+
     let parsedSizes = [];
 
     if (sizes) {
@@ -145,17 +147,18 @@ export const updateProduct = async (req, res) => {
 
         if (Array.isArray(temp)) {
           parsedSizes = temp;
-        } else if (typeof temp === "string") {
-          parsedSizes = temp.split(",").map(s => s.trim());
+        } else {
+          parsedSizes = temp.split(",").map((s) => s.trim());
         }
       } catch {
-        parsedSizes = sizes.split(",").map(s => s.trim());
+        parsedSizes = sizes.split(",").map((s) => s.trim());
       }
     }
 
     /* ==============================
        SAFE HIGHLIGHTS PARSE
     ============================== */
+
     let parsedHighlights = [];
 
     if (highlights) {
@@ -163,15 +166,16 @@ export const updateProduct = async (req, res) => {
         const temp = JSON.parse(highlights);
         parsedHighlights = Array.isArray(temp)
           ? temp
-          : temp.split(",").map(h => h.trim());
+          : temp.split(",").map((h) => h.trim());
       } catch {
-        parsedHighlights = highlights.split(",").map(h => h.trim());
+        parsedHighlights = highlights.split(",").map((h) => h.trim());
       }
     }
 
     /* ==============================
        EXISTING IMAGES PARSE
     ============================== */
+
     let parsedExistingImages = product.images;
 
     if (existingImages) {
@@ -183,8 +187,9 @@ export const updateProduct = async (req, res) => {
     }
 
     /* ==============================
-       BASIC FIELD UPDATE
+       BASIC UPDATE
     ============================== */
+
     product.title = title || product.title;
     product.category = category || product.category;
     product.mrp = mrp || product.mrp;
@@ -196,6 +201,7 @@ export const updateProduct = async (req, res) => {
     /* ==============================
        CATEGORY LOGIC
     ============================== */
+
     if (category === "garbage bags") {
       product.categoryType = categoryType || "";
       product.sizes = parsedSizes;
@@ -207,22 +213,39 @@ export const updateProduct = async (req, res) => {
     /* ==============================
        BOOLEAN FIX
     ============================== */
-    product.amazingDeals = amazingDeals === "true";
-    product.newArrivals = newArrivals === "true";
+
+    product.amazingDeals = amazingDeals === "true" || amazingDeals === true;
+    product.newArrivals = newArrivals === "true" || newArrivals === true;
 
     /* ==============================
        IMAGE MERGE SYSTEM
     ============================== */
+
     let updatedImages = [...parsedExistingImages];
 
     if (req.files && req.files.length > 0) {
-      for (let file of req.files) {
-        const result = await cloudinary.uploader.upload(file.path, {
-          folder: "products",
-        });
 
-        updatedImages.push(result.secure_url);
-      }
+      const newImages = await Promise.all(
+        req.files.map(
+          (file) =>
+            new Promise((resolve, reject) => {
+              const stream = cloudinary.uploader.upload_stream(
+                { folder: "products" },
+                (err, result) => {
+                  if (result) resolve(result.secure_url);
+                  else reject(err);
+                }
+              );
+
+              const bufferStream = new Readable();
+              bufferStream.push(file.buffer);
+              bufferStream.push(null);
+              bufferStream.pipe(stream);
+            })
+        )
+      );
+
+      updatedImages = [...updatedImages, ...newImages];
     }
 
     product.images = updatedImages;
@@ -236,6 +259,7 @@ export const updateProduct = async (req, res) => {
 
   } catch (error) {
     console.error("Update Error:", error);
+
     res.status(500).json({
       message: "Server error while updating product",
     });
