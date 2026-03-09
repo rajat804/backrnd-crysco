@@ -25,6 +25,8 @@ app.use(express.json());
 const allowedOrigins = [
   "http://localhost:5173",
   "https://crysco-frontend.vercel.app",
+  "https://cryscoindia.com",
+  "https://www.cryscoindia.com"
 ];
 
 const corsOptions = {
