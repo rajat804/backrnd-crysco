@@ -3,12 +3,13 @@ import { getNimbusToken } from "../utils/nimbus.js";
 
 export const checkPincode = async (req, res) => {
   try {
+
     const { pincode } = req.body;
 
     const token = await getNimbusToken();
 
     const response = await axios.get(
-      `https://ship.nimbuspost.com/api/v1/courier/serviceability`,
+      "https://ship.nimbuspost.com/api/v1/courier/serviceability",
       {
         params: {
           pickup_postcode: process.env.PICKUP_PINCODE,
@@ -21,8 +22,14 @@ export const checkPincode = async (req, res) => {
       }
     );
 
-    if (response.data.data.available_courier_companies.length === 0) {
-      return res.status(400).json({
+    console.log("Nimbus Response:", response.data);
+
+    if (
+      !response.data.data ||
+      !response.data.data.available_courier_companies ||
+      response.data.data.available_courier_companies.length === 0
+    ) {
+      return res.json({
         success: false,
         message: "Delivery not available on this pincode",
       });
@@ -32,7 +39,15 @@ export const checkPincode = async (req, res) => {
       success: true,
       message: "Delivery available",
     });
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+
+    console.log("Nimbus Error:", err.response?.data || err.message);
+
+    res.status(500).json({
+      success:false,
+      error: err.message,
+    });
+
   }
 };
